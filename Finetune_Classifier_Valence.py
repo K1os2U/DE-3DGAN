@@ -71,21 +71,21 @@ class EEGDataset5D(Dataset):
         for f in sorted(os.listdir(de_dir)):
             if not f.endswith('.mat'): continue
             m = loadmat(os.path.join(de_dir,f))
-            d = m['data']                # (4800,4,9,9)
-            d = d.reshape(40,120,4,9,9)  # (40,120,4,9,9)
+            d = m['data']               
+            d = d.reshape(40,120,4,9,9) 
             de_list.append(d)
-        de = np.concatenate(de_list,axis=0) # (1280,120,4,9,9)
+        de = np.concatenate(de_list,axis=0)
 
         raw_list, lbl_list = [], []
         for trail in preprocessors_results.keys():
-            feat = preprocessors_results[trail]['feature']   # (2400,128,9,9)
-            lab  = preprocessors_results[trail]['label']     # (2400,)
+            feat = preprocessors_results[trail]['feature']  
+            lab  = preprocessors_results[trail]['label']   
             feat = feat.reshape(40, 60, 128, 9, 9)
             lab = lab.reshape(40, 60)
             raw_list.append(feat)
             lbl_list.append(lab)
-        raw = np.concatenate(raw_list,axis=0) # (1280,60,128,9,9)
-        lbl = np.concatenate(lbl_list,axis=0) # (1280,60)
+        raw = np.concatenate(raw_list,axis=0)
+        lbl = np.concatenate(lbl_list,axis=0)
 
         self.de_seg  = de
         self.raw_seg = raw
@@ -123,22 +123,22 @@ class FrameDataset(Dataset):
 
         with torch.no_grad():
             for idx in range(len(trial_ds)):
-                de, raw, label = trial_ds[idx]    # de: (4,120,9,9), raw: (60,128,9,9), label: (60,)
+                de, raw, label = trial_ds[idx]  
                 de, de_mu, de_sigma = robust_norm(de)
                 de = de.unsqueeze(0).cuda()
-                gen = self.G(de)                 # -> (1,60,128,9,9)
-                gen = (gen * de_sigma + de_mu).squeeze(0).cpu()       # (60,128,9,9)
-                raw = raw                       # already CPU tensor
-                label = label                     # (60,)
+                gen = self.G(de)           
+                gen = (gen * de_sigma + de_mu).squeeze(0).cpu()    
+                raw = raw                      
+                label = label                   
 
                 for t in range(gen.shape[0]):
-                    self.gen_all.append(gen[t])      # Tensor (128,9,9)
-                    self.raw_all.append(raw[t])      # Tensor (128,9,9)
-                    self.label_all.append(label[t])  # scalar
+                    self.gen_all.append(gen[t])     
+                    self.raw_all.append(raw[t])     
+                    self.label_all.append(label[t]) 
 
-        self.gen   = torch.stack(self.gen_all,   dim=0)  # (N_frames,128,9,9)
+        self.gen   = torch.stack(self.gen_all,   dim=0) 
         self.raw   = torch.stack(self.raw_all,   dim=0)
-        self.lbl = torch.tensor(self.label_all)       # (N_frames,)
+        self.lbl = torch.tensor(self.label_all)     
 
     def __len__(self):
         return self.gen.shape[0]
