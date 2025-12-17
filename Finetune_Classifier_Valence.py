@@ -184,33 +184,31 @@ class Generator3D_UNet(nn.Module):
     def forward(self, x):
         mask = (x.abs().sum(dim=(1,2), keepdim=True) > 0).float()
         e1 = self.enc1(x)      # (B, b, 120, 9, 9)
-        p1 = self.pool(e1)     # (B, b,  60, 4, 4)
-        e2 = self.enc2(p1)     # (B,2b,  60, 4, 4)
-        p2 = self.pool(e2)     # (B,2b,  30, 2, 2)
-        e3 = self.enc3(p2)     # (B,4b,  30, 2, 2)
-        p3 = self.pool(e3)     # (B,4b,  15, 1, 1)
-        e4 = self.enc4(p3)     # (B,8b,  15, 1, 1)
-        d3 = self.up3(e4)      # (B,4b,  30, 2, 2)
+        p1 = self.pool(e1)     
+        e2 = self.enc2(p1)     
+        p2 = self.pool(e2)     
+        e3 = self.enc3(p2)    
+        p3 = self.pool(e3)     
+        e4 = self.enc4(p3)     
+        d3 = self.up3(e4)     
         d3 = torch.cat([d3, e3], dim=1)
-        d3 = self.dec3(d3)     # (B,4b,  30, 2, 2)
-        d2 = self.up2(d3)      # (B,2b,  60, 4, 4)
+        d3 = self.dec3(d3)    
+        d2 = self.up2(d3)      
         d2 = torch.cat([d2, e2], dim=1)
-        d2 = self.dec2(d2)     # (B,2b,  60, 4, 4)
-        d1 = self.up1(d2)      # (B, b, 120, 8, 8)
+        d2 = self.dec2(d2)    
+        d1 = self.up1(d2)      
         d1 = torch.cat([d1, e1], dim=1)
-        d1 = self.dec1(d1)     # (B, b, 120, 8, 8)
-        out = self.out(d1)     # (B,128,120, 8, 8)
+        d1 = self.dec1(d1)    
+        out = self.out(d1)    
         out = F.interpolate(
             out,
             size=(self.time_len, 9, 9),
             mode='trilinear',
             align_corners=False
-        )                      # (B,128, 60, 9,9)
-
+        )                    
         out = out.permute(0, 2, 1, 3, 4).contiguous()
         out = out * self.alpha
-        return out * mask  # (B, 60,128, 9,9)
-
+        return out * mask  
 # Multi scale convolution module
 class InceptionConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, bias=True):
@@ -270,14 +268,14 @@ class SEBlock(nn.Module):
     def __init__(self, channels, reduction=8):
         super().__init__()
         self.fc = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),              # (B,C,1,1)
+            nn.AdaptiveAvgPool2d(1),             
             nn.Conv2d(channels, channels//reduction, 1),
             nn.SELU(inplace=True),
             nn.Conv2d(channels//reduction, channels, 1),
             nn.Sigmoid()
         )
     def forward(self, x):
-        w = self.fc(x)   # (B,C,1,1)
+        w = self.fc(x) 
         return x * w
 
 # Spatial attention module
@@ -287,8 +285,8 @@ class SpatialAttention(nn.Module):
         self.conv = nn.Conv2d(2,1,kernel_size,padding=kernel_size//2,bias=False)
         self.sig  = nn.Sigmoid()
     def forward(self, x):
-        maxc,_ = x.max(dim=1,keepdim=True)  # (B,1,H,W)
-        avgc   = x.mean(dim=1,keepdim=True) # (B,1,H,W)
+        maxc,_ = x.max(dim=1,keepdim=True)  
+        avgc   = x.mean(dim=1,keepdim=True) 
         att    = self.sig(self.conv(torch.cat([maxc,avgc],dim=1)))
         return x * att
 
@@ -449,7 +447,7 @@ class Trainer():
         z, x, y = z.cuda(), x.cuda(), y.cuda()
         with torch.no_grad():
             logits, _ = self.c_model(x)
-            probs = torch.softmax(logits, dim=1)[:, 1]  # 取正类概率
+            probs = torch.softmax(logits, dim=1)[:, 1]  
         self.all_preds.append(probs.cpu().numpy())
         self.all_labels.append(y.cpu().numpy())
         return logits.cpu(), z.cpu()
