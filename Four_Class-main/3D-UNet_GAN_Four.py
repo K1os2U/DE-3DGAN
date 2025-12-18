@@ -54,21 +54,21 @@ class EEGDataset5D(Dataset):
         for f in sorted(os.listdir(de_dir)):
             if not f.endswith('.mat'): continue
             m = loadmat(os.path.join(de_dir,f))
-            d = m['data']                # (4800,4,9,9)
-            d = d.reshape(40,120,4,9,9)  # (40,120,4,9,9)
+            d = m['data']               
+            d = d.reshape(40,120,4,9,9) 
             de_list.append(d)
-        de = np.concatenate(de_list,axis=0) # (1280,120,4,9,9)
+        de = np.concatenate(de_list,axis=0) 
 
         raw_list, lbl_list = [], []
         for trail in preprocessors_results.keys():
-            feat = preprocessors_results[trail]['feature']   # (2400,128,9,9)
-            lab  = preprocessors_results[trail]['label']     # (2400,)
+            feat = preprocessors_results[trail]['feature']  
+            lab  = preprocessors_results[trail]['label']   
             feat = feat.reshape(40, 60, 128, 9, 9)
             lab = lab.reshape(40, 60)
             raw_list.append(feat)
             lbl_list.append(lab)
-        raw = np.concatenate(raw_list,axis=0) # (1280,60,128,9,9)
-        lbl = np.concatenate(lbl_list,axis=0) # (1280,60)
+        raw = np.concatenate(raw_list,axis=0)
+        lbl = np.concatenate(lbl_list,axis=0)
 
         self.de_seg  = de
         self.raw_seg = raw
@@ -131,45 +131,44 @@ class Generator3D_UNet(nn.Module):
     def forward(self, x):
         mask = (x.abs().sum(dim=(1,2), keepdim=True) > 0).float()
         e1 = self.enc1(x)      # (B, b, 120, 9, 9)
-        p1 = self.pool(e1)     # (B, b,  60, 4, 4)
-        e2 = self.enc2(p1)     # (B,2b,  60, 4, 4)
-        p2 = self.pool(e2)     # (B,2b,  30, 2, 2)
-        e3 = self.enc3(p2)     # (B,4b,  30, 2, 2)
-        p3 = self.pool(e3)     # (B,4b,  15, 1, 1)
-        e4 = self.enc4(p3)     # (B,8b,  15, 1, 1)
-        d3 = self.up3(e4)      # (B,4b,  30, 2, 2)
+        p1 = self.pool(e1)     
+        e2 = self.enc2(p1)    
+        p2 = self.pool(e2)    
+        e3 = self.enc3(p2)    
+        p3 = self.pool(e3)    
+        e4 = self.enc4(p3)   
+        d3 = self.up3(e4)     
         d3 = torch.cat([d3, e3], dim=1)
-        d3 = self.dec3(d3)     # (B,4b,  30, 2, 2)
-        d2 = self.up2(d3)      # (B,2b,  60, 4, 4)
+        d3 = self.dec3(d3)    
+        d2 = self.up2(d3)     
         d2 = torch.cat([d2, e2], dim=1)
-        d2 = self.dec2(d2)     # (B,2b,  60, 4, 4)
-        d1 = self.up1(d2)      # (B, b, 120, 8, 8)
+        d2 = self.dec2(d2)   
+        d1 = self.up1(d2)    
         d1 = torch.cat([d1, e1], dim=1)
-        d1 = self.dec1(d1)     # (B, b, 120, 8, 8)
-        out = self.out(d1)     # (B,128,120, 8, 8)
+        d1 = self.dec1(d1)   
+        out = self.out(d1)    
 
         out = F.interpolate(
             out,
             size=(self.time_len, 9, 9),
             mode='trilinear',
             align_corners=False
-        )                      # (B,128, 60, 9,9)
+        )                     
         out = out.permute(0, 2, 1, 3, 4).contiguous()
         out = out * self.alpha
-        return out * mask  # (B, 60,128, 9,9)
-
+        return out * mask 
 class SEBlock(nn.Module):
     def __init__(self, channels, reduction=8):
         super().__init__()
         self.fc = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),              # (B,C,1,1)
+            nn.AdaptiveAvgPool2d(1),             
             nn.Conv2d(channels, channels//reduction, 1),
             nn.SELU(inplace=True),
             nn.Conv2d(channels//reduction, channels, 1),
             nn.Sigmoid()
         )
     def forward(self, x):
-        w = self.fc(x)   # (B,C,1,1)
+        w = self.fc(x)  
         return x * w
 
 class SpatialAttention(nn.Module):
@@ -178,8 +177,8 @@ class SpatialAttention(nn.Module):
         self.conv = nn.Conv2d(2,1,kernel_size,padding=kernel_size//2,bias=False)
         self.sig  = nn.Sigmoid()
     def forward(self, x):
-        maxc,_ = x.max(dim=1,keepdim=True)  # (B,1,H,W)
-        avgc   = x.mean(dim=1,keepdim=True) # (B,1,H,W)
+        maxc,_ = x.max(dim=1,keepdim=True) 
+        avgc   = x.mean(dim=1,keepdim=True)
         att    = self.sig(self.conv(torch.cat([maxc,avgc],dim=1)))
         return x * att
 
@@ -361,8 +360,7 @@ class Trainer5D:
             for de_raw, raw_raw,label in self.ts_loader:
                 de = robust_norm(de_raw.cuda())
                 raw = robust_norm(raw_raw.cuda())
-                gen = self.G(de)  # (B,60,128,9,9)
-
+                gen = self.G(de) 
                 loss = self.mse(gen, raw) * de.size(0)
                 total_mse += loss
                 total_n += de.size(0)
