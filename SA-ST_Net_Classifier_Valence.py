@@ -125,14 +125,14 @@ class SEBlock(nn.Module):
     def __init__(self, channels, reduction=8):
         super().__init__()
         self.fc = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),              # (B,C,1,1)
+            nn.AdaptiveAvgPool2d(1),             
             nn.Conv2d(channels, channels//reduction, 1),
             nn.SELU(inplace=True),
             nn.Conv2d(channels//reduction, channels, 1),
             nn.Sigmoid()
         )
     def forward(self, x):
-        w = self.fc(x)   # (B,C,1,1)
+        w = self.fc(x)  
         return x * w
 
 # Multi scale convolution module
@@ -168,8 +168,8 @@ class SpatialAttention(nn.Module):
         self.conv = nn.Conv2d(2,1,kernel_size,padding=kernel_size//2,bias=False)
         self.sig  = nn.Sigmoid()
     def forward(self, x):
-        maxc,_ = x.max(dim=1,keepdim=True)  # (B,1,H,W)
-        avgc   = x.mean(dim=1,keepdim=True) # (B,1,H,W)
+        maxc,_ = x.max(dim=1,keepdim=True)  
+        avgc   = x.mean(dim=1,keepdim=True) 
         att    = self.sig(self.conv(torch.cat([maxc,avgc],dim=1)))
         return x * att
 
